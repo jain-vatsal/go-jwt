@@ -4,7 +4,7 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
-	cns "github.com/jain-vatsal/go-jwt/cns"
+	cns "github.com/jain-vatsal/go-jwt/constants"
 	routes "github.com/jain-vatsal/go-jwt/routes"
 )
 
