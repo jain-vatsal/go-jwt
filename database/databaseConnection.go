@@ -37,10 +37,9 @@ func DBInstance() *mongo.Client {
 	return client
 }
 
+var Client *mongo.Client = DBInstance()
 
-client := DBInstance()
-
-func OpenCollection(client *mongo.Client, collectionName string) *mongo.Collection{
+func OpenCollection(client *mongo.Client, collectionName string) *mongo.Collection {
 	collection := client.Database("cluster0").Collection(collectionName)
 	return collection
 }
