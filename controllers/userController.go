@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -103,7 +104,7 @@ func SignUpUser() gin.HandlerFunc {
 func LoginUser() gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-		ctx, cancel := context.WithTimeout(context.Background())
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 		var user models.User
 		var foundUser models.User
 
@@ -143,8 +144,60 @@ func LoginUser() gin.HandlerFunc {
 
 }
 
-func GetAllUsers() {
+func GetAllUsers() gin.HandlerFunc {
 
+	return func(c *gin.Context) {
+
+		if err := helpers.CheckUserType(c, "ADMIN"); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+		recordPerPage, err := strconv.Atoi(c.Query("recordPerPage"))
+		if err != nil || recordPerPage < 1 {
+			recordPerPage = 10
+		}
+		page, pageErr := strconv.Atoi(c.Query("page"))
+		if pageErr != nil || page < 1 {
+			page = 1
+		}
+
+		startIndex := (page - 1) * recordPerPage
+		// startIndex, _ := strconv.Atoi(startIdx)
+
+		matchStage := bson.D{{Key: "$match", Value: bson.D{{}}}}
+		groupStage := bson.D{
+			{Key: "$group", Value: bson.D{
+				{Key: "_id", Value: bson.D{{Key: "_id", Value: "null"}}},
+				{Key: "total_count", Value: bson.D{{Key: "$sum", Value: 1}}},
+				{Key: "data", Value: bson.D{{Key: "$push", Value: "$$ROOT"}}},
+			}},
+		}
+		projectStage := bson.D{
+			{Key: "$project", Value: bson.D{
+				{Key: "_id", Value: 0},
+				{Key: "total_count", Value: 1},
+				{Key: "user_items", Value: bson.D{{Key: "$slice", Value: []interface{}{"$data", startIndex, recordPerPage}}}},
+			}},
+		}
+
+		result, aggregateErr := userCollection.Aggregate(ctx, mongo.Pipeline{
+			matchStage, groupStage, projectStage,
+		})
+		defer cancel()
+
+		if aggregateErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "error occured while listing user items"})
+		}
+		var allUsers []bson.M
+		if err := result.All(ctx, &allUsers); err != nil {
+			log.Fatal(err)
+		}
+
+		c.JSON(http.StatusOK, allUsers[0])
+
+	}
 }
 
 func GetUser() gin.HandlerFunc {
