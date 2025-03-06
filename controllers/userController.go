@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -37,7 +36,7 @@ func VerifyPassword(userPassword string, providedPassword string) (bool, string)
 	msg := ""
 
 	if err != nil {
-		msg = fmt.Sprintf("email or password is incorrect")
+		msg = "email or password is incorrect"
 		check = false
 	}
 	return check, msg
@@ -47,6 +46,8 @@ func SignUpUser() gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+		defer cancel()
+
 		var user models.User
 
 		if err := c.BindJSON(&user); err != nil {
@@ -62,7 +63,6 @@ func SignUpUser() gin.HandlerFunc {
 		}
 
 		countEmail, errEmail := userCollection.CountDocuments(ctx, bson.M{"email": user.Email})
-		defer cancel()
 
 		if errEmail != nil {
 			log.Panic(errEmail)
@@ -72,7 +72,6 @@ func SignUpUser() gin.HandlerFunc {
 		password := HashPassword(*user.Password)
 		user.Password = &password
 		countPhone, errPhone := userCollection.CountDocuments(ctx, bson.M{"phone": user.Phone})
-		defer cancel()
 		if errPhone != nil {
 			log.Panic(errPhone)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "error occured while checking for the phone number"})
@@ -86,17 +85,16 @@ func SignUpUser() gin.HandlerFunc {
 		user.Updated_At, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 		user.ID = primitive.NewObjectID()
 		user.User_ID = user.ID.Hex()
-		token, refreshToken, _ := helpers.GenerateAllTokens(*user.Email, *user.First_Name, *user.Last_Name, *user.User_Type, *&user.User_ID)
+		token, refreshToken, _ := helpers.GenerateAllTokens(*user.Email, *user.First_Name, *user.Last_Name, *user.User_Type, user.User_ID)
 		user.Token = &token
 		user.Refresh_Token = &refreshToken
 
 		resultInsertionNumber, insertErr := userCollection.InsertOne(ctx, user)
 		if insertErr != nil {
-			msg := fmt.Sprintf("User item was not created")
+			msg := "user item was not created"
 			c.JSON(http.StatusInternalServerError, gin.H{"error": msg})
 		}
 
-		defer cancel()
 		c.JSON(http.StatusOK, resultInsertionNumber)
 	}
 }
@@ -105,6 +103,8 @@ func LoginUser() gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+		defer cancel()
+
 		var user models.User
 		var foundUser models.User
 
@@ -114,17 +114,13 @@ func LoginUser() gin.HandlerFunc {
 		}
 
 		err := userCollection.FindOne(ctx, bson.M{"email": user.Email}).Decode(&user)
-		defer cancel()
-
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "email or password is incorrect"})
 			return
 		}
 
 		passwordIsValid, msg := VerifyPassword(*user.Password, *foundUser.Password)
-		defer cancel()
-
-		if passwordIsValid != true {
+		if !passwordIsValid {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": msg})
 			return
 		}
@@ -132,7 +128,7 @@ func LoginUser() gin.HandlerFunc {
 		if foundUser.Email != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "user not found"})
 		}
-		token, refreshToken, _ := helpers.GenerateAllTokens(*foundUser.Email, *foundUser.First_Name, *foundUser.Last_Name, *foundUser.User_Type, *&foundUser.User_ID)
+		token, refreshToken, _ := helpers.GenerateAllTokens(*foundUser.Email, *foundUser.First_Name, *foundUser.Last_Name, *foundUser.User_Type, foundUser.User_ID)
 		helpers.UpdateAllTokens(token, refreshToken, foundUser.User_ID)
 		err = userCollection.FindOne(ctx, bson.M{"user_id": foundUser.User_ID}).Decode(&foundUser)
 
