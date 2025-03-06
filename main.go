@@ -4,13 +4,14 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	cns "github.com/jain-vatsal/go-jwt/cns"
 	routes "github.com/jain-vatsal/go-jwt/routes"
 )
 
 func main() {
-	port := os.Getenv("PORT")
+	port := os.Getenv(cns.PORT)
 	if port == "" {
-		port = "8000"
+		port = cns.DEFAULTPORT
 	}
 
 	router := gin.New()
@@ -19,11 +20,11 @@ func main() {
 	routes.AuthRoutes(router)
 	routes.UserRoutes(router)
 
-	router.GET("/api-1", func(c *gin.Context) {
+	router.GET(cns.API_1, func(c *gin.Context) {
 		c.JSON(200, gin.H{"success": "Access granted for API-1"})
 	})
 
-	router.GET("/api-2", func(c *gin.Context) {
+	router.GET(cns.API_1, func(c *gin.Context) {
 		c.JSON(200, gin.H{"success": "Access granted for API-2"})
 	})
 
