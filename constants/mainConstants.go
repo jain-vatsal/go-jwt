@@ -1,9 +1,7 @@
-package cns
+package constants
 
 const (
-	PORT  string = "PORT"
-	API_1 string = "/api-1"
-	API_2 string = "/api-2"
+	PORT string = "PORT"
 )
 
 const (
