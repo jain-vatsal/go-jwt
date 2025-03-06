@@ -113,9 +113,17 @@ func LoginUser() gin.HandlerFunc {
 			return
 		}
 
-		err := userCollection.FindOne(ctx, bson.M{"email": user.Email}).Decode(&user)
+		err := userCollection.FindOne(ctx, bson.M{"email": user.Email}).Decode(&foundUser)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "email or password is incorrect"})
+			return
+		}
+		if user.Password == nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "user password is nil"})
+			return
+		}
+		if foundUser.Password == nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "foundUser password is nil"})
 			return
 		}
 
@@ -125,15 +133,13 @@ func LoginUser() gin.HandlerFunc {
 			return
 		}
 
-		if foundUser.Email != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "user not found"})
-		}
 		token, refreshToken, _ := helpers.GenerateAllTokens(*foundUser.Email, *foundUser.First_Name, *foundUser.Last_Name, *foundUser.User_Type, foundUser.User_ID)
 		helpers.UpdateAllTokens(token, refreshToken, foundUser.User_ID)
 		err = userCollection.FindOne(ctx, bson.M{"user_id": foundUser.User_ID}).Decode(&foundUser)
 
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
 		}
 		c.JSON(http.StatusOK, foundUser)
 	}
